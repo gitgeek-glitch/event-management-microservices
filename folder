@@ -1,0 +1,22 @@
+event-booking-system/
+│
+├── services/
+│   ├── event-service/              # MongoDB
+│   ├── student-service/            # PostgreSQL
+│   ├── session-service/            # MongoDB
+│   ├── registration-service/       # PostgreSQL
+│   ├── payment-service/            # MongoDB
+│   ├── email-service/              # No DB needed
+│   ├── notification-service/       # Firebase or No DB
+│
+├── api-gateway/                    # Express or NGINX Gateway
+│
+├── shared/                         # Shared configs/utilities
+│   ├── auth/
+│   ├── database/
+│   └── middlewares/
+│
+├── docker-compose.yml              # Dev setup
+├── k8s/                            # Kubernetes manifests
+│
+└── README.md
