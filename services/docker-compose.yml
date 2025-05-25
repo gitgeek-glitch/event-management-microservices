@@ -19,3 +19,8 @@ services:
     build: ./session-service
     ports:
       - "3004:3004"
+
+  payment-service:
+    build: ./payment-service
+    ports:
+      - "3006:3006"
