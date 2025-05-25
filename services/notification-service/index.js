@@ -12,6 +12,6 @@ app.get("/health", (req, res) => res.send("Notification Service is healthy"));
 
 const PORT = process.env.PORT || 3007;
 app.listen(PORT, () => 
-    console.log(`Firebase Connected`) &&
+    console.log(`Firebase Connected`) ||
     console.log(`Notification Service running on port ${PORT}`
     ));
