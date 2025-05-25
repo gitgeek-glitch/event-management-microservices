@@ -2,8 +2,47 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import Payment from "../models/payment.model.js";
 import dotenv from "dotenv";
+import winston from "winston";
 
 dotenv.config();
+
+// Configure Winston logger
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.combine(
+    winston.format.timestamp({
+      format: 'YYYY-MM-DD HH:mm:ss'
+    }),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  defaultMeta: { service: 'payment-service' },
+  transports: [
+    // Write errors to error.log
+    new winston.transports.File({ 
+      filename: 'logs/error.log', 
+      level: 'error',
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+    }),
+    // Write all logs to combined.log
+    new winston.transports.File({ 
+      filename: 'logs/combined.log',
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+    })
+  ],
+});
+
+// Add console transport for development
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.combine(
+      winston.format.colorize(),
+      winston.format.simple()
+    )
+  }));
+}
 
 // Initialize Razorpay with proper error handling
 let razorpay;
@@ -19,10 +58,10 @@ const initializeRazorpay = () => {
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    console.log('✅ Razorpay initialized successfully');
+    logger.info('Razorpay initialized successfully');
     return true;
   } catch (error) {
-    console.error('❌ Failed to initialize Razorpay:', error.message);
+    logger.error('Failed to initialize Razorpay', { error: error.message });
     return false;
   }
 };
@@ -41,6 +80,7 @@ const generateOrderId = () => {
 export const createPaymentOrder = async (req, res) => {
   try {
     if (!isRazorpayInitialized) {
+      logger.error('Payment service not properly configured');
       return res.status(500).json({ 
         error: "Payment service not properly configured" 
       });
@@ -48,7 +88,12 @@ export const createPaymentOrder = async (req, res) => {
 
     const { amount, studentId, eventId, registrationId, notes = {} } = req.body;
 
-    console.log('Creating payment order:', { amount, studentId, eventId, registrationId });
+    logger.info('Creating payment order', { 
+      amount, 
+      studentId, 
+      eventId, 
+      registrationId 
+    });
 
     // Generate unique order ID
     const orderId = generateOrderId();
@@ -66,7 +111,10 @@ export const createPaymentOrder = async (req, res) => {
       }
     });
 
-    console.log('Razorpay order created:', razorpayOrder.id);
+    logger.info('Razorpay order created', { 
+      razorpayOrderId: razorpayOrder.id,
+      orderId 
+    });
 
     // Save payment record to database
     const payment = new Payment({
@@ -81,7 +129,10 @@ export const createPaymentOrder = async (req, res) => {
     });
 
     const savedPayment = await payment.save();
-    console.log('Payment record saved:', savedPayment._id);
+    logger.info('Payment record saved', { 
+      paymentId: savedPayment._id,
+      razorpayOrderId: razorpayOrder.id 
+    });
 
     res.status(201).json({
       success: true,
@@ -93,7 +144,10 @@ export const createPaymentOrder = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Create payment order error:", error);
+    logger.error('Create payment order error', { 
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({ 
       error: "Failed to create payment order",
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -110,10 +164,18 @@ export const verifyPayment = async (req, res) => {
       razorpay_signature 
     } = req.body;
 
-    console.log('Verifying payment:', { razorpay_order_id, razorpay_payment_id });
+    logger.info('Verifying payment', { 
+      razorpay_order_id, 
+      razorpay_payment_id 
+    });
 
     // Validate required fields
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      logger.warn('Missing payment verification data', {
+        razorpay_order_id: !!razorpay_order_id,
+        razorpay_payment_id: !!razorpay_payment_id,
+        razorpay_signature: !!razorpay_signature
+      });
       return res.status(400).json({ 
         error: "Missing payment verification data",
         required: ['razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature']
@@ -126,7 +188,7 @@ export const verifyPayment = async (req, res) => {
     });
 
     if (!payment) {
-      console.log('Payment record not found for order:', razorpay_order_id);
+      logger.warn('Payment record not found', { razorpay_order_id });
       return res.status(404).json({ error: "Payment record not found" });
     }
 
@@ -137,7 +199,10 @@ export const verifyPayment = async (req, res) => {
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
-      console.log('Signature verification failed');
+      logger.error('Payment signature verification failed', {
+        razorpay_order_id,
+        razorpay_payment_id
+      });
       
       // Update payment status to failed
       payment.status = "failed";
@@ -156,7 +221,11 @@ export const verifyPayment = async (req, res) => {
     payment.status = "paid";
     const updatedPayment = await payment.save();
 
-    console.log('Payment verified successfully:', updatedPayment._id);
+    logger.info('Payment verified successfully', { 
+      paymentId: updatedPayment._id,
+      razorpay_order_id,
+      razorpay_payment_id
+    });
 
     res.json({
       success: true,
@@ -166,7 +235,10 @@ export const verifyPayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Payment verification error:", error);
+    logger.error('Payment verification error', { 
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({ 
       error: "Payment verification failed",
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -179,20 +251,27 @@ export const getPaymentDetails = async (req, res) => {
   try {
     const { paymentId } = req.params;
     
-    console.log('Fetching payment details for:', paymentId);
+    logger.info('Fetching payment details', { paymentId });
 
     const payment = await Payment.findById(paymentId);
     
     if (!payment) {
+      logger.warn('Payment not found', { paymentId });
       return res.status(404).json({ error: "Payment not found" });
     }
+
+    logger.info('Payment details retrieved successfully', { paymentId });
 
     res.json({
       success: true,
       payment
     });
   } catch (error) {
-    console.error("Get payment details error:", error);
+    logger.error('Get payment details error', { 
+      paymentId: req.params.paymentId,
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({ 
       error: "Failed to fetch payment details",
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -206,7 +285,12 @@ export const getPaymentsByStudent = async (req, res) => {
     const { studentId } = req.params;
     const { status, page = 1, limit = 10 } = req.query;
 
-    console.log('Fetching payments for student:', studentId);
+    logger.info('Fetching payments for student', { 
+      studentId, 
+      status, 
+      page, 
+      limit 
+    });
 
     const query = { studentId: String(studentId) };
     if (status) {
@@ -224,6 +308,13 @@ export const getPaymentsByStudent = async (req, res) => {
 
     const total = await Payment.countDocuments(query);
 
+    logger.info('Payments retrieved for student', { 
+      studentId, 
+      count: payments.length, 
+      total,
+      page: pageNumber
+    });
+
     res.json({
       success: true,
       payments,
@@ -235,7 +326,11 @@ export const getPaymentsByStudent = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Get payments by student error:", error);
+    logger.error('Get payments by student error', { 
+      studentId: req.params.studentId,
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({ 
       error: "Failed to fetch payments",
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -249,7 +344,12 @@ export const getPaymentsByEvent = async (req, res) => {
     const { eventId } = req.params;
     const { status, page = 1, limit = 10 } = req.query;
 
-    console.log('Fetching payments for event:', eventId);
+    logger.info('Fetching payments for event', { 
+      eventId, 
+      status, 
+      page, 
+      limit 
+    });
 
     const query = { eventId: String(eventId) };
     if (status) {
@@ -267,6 +367,13 @@ export const getPaymentsByEvent = async (req, res) => {
 
     const total = await Payment.countDocuments(query);
 
+    logger.info('Payments retrieved for event', { 
+      eventId, 
+      count: payments.length, 
+      total,
+      page: pageNumber
+    });
+
     res.json({
       success: true,
       payments,
@@ -278,7 +385,11 @@ export const getPaymentsByEvent = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Get payments by event error:", error);
+    logger.error('Get payments by event error', { 
+      eventId: req.params.eventId,
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({ 
       error: "Failed to fetch payments",
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -292,15 +403,24 @@ export const refundPayment = async (req, res) => {
     const { paymentId } = req.params;
     const { amount, reason = "Requested by user" } = req.body;
 
-    console.log('Processing refund for payment:', paymentId);
+    logger.info('Processing refund for payment', { 
+      paymentId, 
+      amount, 
+      reason 
+    });
 
     const payment = await Payment.findById(paymentId);
     
     if (!payment) {
+      logger.warn('Payment not found for refund', { paymentId });
       return res.status(404).json({ error: "Payment not found" });
     }
 
     if (payment.status !== "paid") {
+      logger.warn('Invalid payment status for refund', { 
+        paymentId, 
+        currentStatus: payment.status 
+      });
       return res.status(400).json({ 
         error: "Only paid payments can be refunded",
         currentStatus: payment.status
@@ -308,6 +428,7 @@ export const refundPayment = async (req, res) => {
     }
 
     if (!payment.razorpayPaymentId) {
+      logger.error('Missing Razorpay payment ID for refund', { paymentId });
       return res.status(400).json({ 
         error: "Payment ID not found for refund processing" 
       });
@@ -332,7 +453,11 @@ export const refundPayment = async (req, res) => {
     payment.failureReason = String(reason);
     await payment.save();
 
-    console.log('Refund processed successfully:', refund.id);
+    logger.info('Refund processed successfully', { 
+      paymentId, 
+      refundId: refund.id, 
+      refundAmount: refund.amount / 100 
+    });
 
     res.json({
       success: true,
@@ -343,7 +468,11 @@ export const refundPayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Refund payment error:", error);
+    logger.error('Refund payment error', { 
+      paymentId: req.params.paymentId,
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({ 
       error: "Failed to process refund",
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -357,11 +486,15 @@ export const handleWebhook = async (req, res) => {
     const webhookSignature = req.headers['x-razorpay-signature'];
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-    console.log('Webhook received:', req.body?.event);
+    logger.info('Webhook received', { 
+      event: req.body?.event,
+      hasSignature: !!webhookSignature
+    });
 
     // Skip signature verification in development mode if no webhook secret
     if (process.env.NODE_ENV !== 'development' || webhookSecret) {
       if (!webhookSignature) {
+        logger.warn('Missing webhook signature');
         return res.status(400).json({ error: 'Missing webhook signature' });
       }
 
@@ -372,7 +505,7 @@ export const handleWebhook = async (req, res) => {
         .digest('hex');
 
       if (webhookSignature !== expectedSignature) {
-        console.log('Invalid webhook signature');
+        logger.error('Invalid webhook signature');
         return res.status(400).json({ error: 'Invalid webhook signature' });
       }
     }
@@ -391,12 +524,17 @@ export const handleWebhook = async (req, res) => {
         await handleRefundProcessed(payload.refund.entity);
         break;
       default:
-        console.log(`Unhandled webhook event: ${event}`);
+        logger.info('Unhandled webhook event', { event });
     }
 
+    logger.info('Webhook processed successfully', { event });
     res.json({ success: true, event });
   } catch (error) {
-    console.error('Webhook handler error:', error);
+    logger.error('Webhook handler error', { 
+      error: error.message,
+      stack: error.stack,
+      event: req.body?.event
+    });
     res.status(500).json({ 
       error: 'Webhook processing failed',
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -416,10 +554,16 @@ const handlePaymentCaptured = async (paymentData) => {
       payment.razorpayPaymentId = paymentData.id;
       payment.paymentMethod = paymentData.method;
       await payment.save();
-      console.log('Payment captured via webhook:', payment._id);
+      logger.info('Payment captured via webhook', { 
+        paymentId: payment._id,
+        razorpayPaymentId: paymentData.id
+      });
     }
   } catch (error) {
-    console.error('Handle payment captured error:', error);
+    logger.error('Handle payment captured error', { 
+      error: error.message,
+      paymentDataId: paymentData?.id
+    });
   }
 };
 
@@ -433,10 +577,17 @@ const handlePaymentFailed = async (paymentData) => {
       payment.status = 'failed';
       payment.failureReason = paymentData.error_description || 'Payment failed';
       await payment.save();
-      console.log('Payment failed via webhook:', payment._id);
+      logger.warn('Payment failed via webhook', { 
+        paymentId: payment._id,
+        razorpayPaymentId: paymentData.id,
+        reason: paymentData.error_description
+      });
     }
   } catch (error) {
-    console.error('Handle payment failed error:', error);
+    logger.error('Handle payment failed error', { 
+      error: error.message,
+      paymentDataId: paymentData?.id
+    });
   }
 };
 
@@ -450,9 +601,15 @@ const handleRefundProcessed = async (refundData) => {
       payment.status = 'refunded';
       payment.refundId = refundData.id;
       await payment.save();
-      console.log('Refund processed via webhook:', payment._id);
+      logger.info('Refund processed via webhook', { 
+        paymentId: payment._id,
+        refundId: refundData.id
+      });
     }
   } catch (error) {
-    console.error('Handle refund processed error:', error);
+    logger.error('Handle refund processed error', { 
+      error: error.message,
+      refundDataId: refundData?.id
+    });
   }
 };

@@ -7,13 +7,6 @@ import paymentRoutes from "./routes/payment.routes.js";
 // Load environment variables first
 dotenv.config();
 
-// Debug: Check if environment variables are loaded
-console.log('Environment check:');
-console.log('PORT:', process.env.PORT);
-console.log('RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID ? 'Found' : 'Missing');
-console.log('RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET ? 'Found' : 'Missing');
-console.log('MONGO_URI:', process.env.MONGO_URI ? 'Found' : 'Missing');
-
 const app = express();
 
 // CORS configuration
@@ -37,7 +30,8 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'x-razorpay-signature']
 };
 
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions));
+app.use(cors);
 
 // Middleware for parsing requests
 app.use(express.json({ limit: '10mb' }));
@@ -109,14 +103,10 @@ const startServer = async () => {
   try {
     // Connect to database first
     await connectDB();
-    console.log('Database connection established');
     
     // Start the server
     const server = app.listen(PORT, () => {
-      console.log(`🚀 Payment Service running on port ${PORT}`);
-      console.log(`🔑 Razorpay configured: ${!!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET)}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📡 Health check: http://localhost:${PORT}/health`);
+      console.log(`Payment Service running on port ${PORT}`);
     });
 
     // Handle server errors
