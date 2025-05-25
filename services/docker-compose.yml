@@ -19,3 +19,8 @@ services:
     build: ./session-service
     ports:
       - "3004:3004"
+
+  email-service:
+    build: ./email-service
+    ports:
+      - "3005:3005"
