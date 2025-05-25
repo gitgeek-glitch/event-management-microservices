@@ -1,18 +1,18 @@
 import express from "express";
+import dotenv from "dotenv";
+import { connectDB } from "./config/db.js";
+import studentRoutes from "./routes/student.routes.js";
+
+dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3002;
-
 app.use(express.json());
 
-app.get("/health", (req, res) => res.send("Student Service is healthy."));
-app.get("/students", (req, res) => {
-  res.json([
-    { id: 1, name: "Alice", department: "CSE" },
-    { id: 2, name: "Bob", department: "ECE" },
-  ]);
-});
+app.use("/api/students", studentRoutes);
+app.get("/health", (req, res) => res.send("Student Service is healthy"));
 
-app.listen(PORT, () => {
-  console.log(`✅ Student Service running on port ${PORT}`);
+const PORT = process.env.PORT || 3002;
+
+connectDB().then(() => {
+  app.listen(PORT, () => console.log(`Student Service running on port ${PORT}`));
 });

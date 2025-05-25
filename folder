@@ -20,3 +20,5 @@ event-booking-system/
 ├── k8s/                            # Kubernetes manifests
 │
 └── README.md
+
+student-service-database
