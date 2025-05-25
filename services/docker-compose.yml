@@ -29,3 +29,8 @@ services:
     build: ./payment-service
     ports:
       - "3006:3006"
+
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "3007:3007"

@@ -11,4 +11,4 @@ app.use("/api/notifications", notificationRoutes);
 app.get("/health", (req, res) => res.send("Notification Service is healthy"));
 
 const PORT = process.env.PORT || 3007;
-app.listen(PORT, () => console.log(`🚀 Notification Service running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Notification Service running on port ${PORT}`));
