@@ -9,3 +9,13 @@ services:
     build: ./student-service
     ports:
       - "3002:3002"
+  
+  registration-service:
+    build: ./registration-service
+    ports:
+      - "3003:3003"
+
+  session-service:
+    build: ./session-service
+    ports:
+      - "3004:3004"
