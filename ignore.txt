@@ -1,0 +1,3 @@
+supa: student-service-database
+mongo-session: g4le2fbvo7aVCzHz
+mongodb+srv://gaurangshirodkarcoding:g4le2fbvo7aVCzHz@cluster0.4obujtx.mongodb.net/
