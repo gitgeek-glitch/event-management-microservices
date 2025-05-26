@@ -1,36 +1,84 @@
-version: "3.9"
 services:
   event-service:
     build: ./event-service
     ports:
       - "3001:3001"
+    environment:
+      - PORT=3001
+    networks:
+      - event-booking-network
+    restart: unless-stopped
 
   student-service:
     build: ./student-service
     ports:
       - "3002:3002"
-  
+    environment:
+      - PORT=3002
+    env_file:
+      - ./student-service/.env
+    networks:
+      - event-booking-network
+    restart: unless-stopped
+
   registration-service:
     build: ./registration-service
     ports:
       - "3003:3003"
+    environment:
+      - PORT=3003
+    env_file:
+      - ./registration-service/.env
+    depends_on:
+      - event-service
+      - student-service
+    networks:
+      - event-booking-network
+    restart: unless-stopped
 
   session-service:
     build: ./session-service
     ports:
       - "3004:3004"
+    environment:
+      - PORT=3004
+    networks:
+      - event-booking-network
+    restart: unless-stopped
 
   email-service:
     build: ./email-service
     ports:
       - "3005:3005"
+    environment:
+      - PORT=3005
+    networks:
+      - event-booking-network
+    restart: unless-stopped
 
   payment-service:
     build: ./payment-service
     ports:
       - "3006:3006"
+    environment:
+      - PORT=3006
+    networks:
+      - event-booking-network
+    restart: unless-stopped
 
   notification-service:
     build: ./notification-service
     ports:
       - "3007:3007"
+    environment:
+      - PORT=3007
+    networks:
+      - event-booking-network
+    restart: unless-stopped
+
+networks:
+  event-booking-network:
+    driver: bridge
+
+volumes:
+  event-booking-data:
