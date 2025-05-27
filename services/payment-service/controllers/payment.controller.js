@@ -58,7 +58,7 @@ const initializeRazorpay = () => {
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    logger.info('Razorpay initialized successfully');
+    console.log('Razorpay initialized successfully');
     return true;
   } catch (error) {
     logger.error('Failed to initialize Razorpay', { error: error.message });
