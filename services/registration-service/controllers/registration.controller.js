@@ -62,122 +62,58 @@ export const createRegistration = async (req, res) => {
     } = req.body;
 
     let participantIds = [];
-    
+
     if (participants_ids && Array.isArray(participants_ids)) {
-      participantIds = participants_ids;
+      participantIds = participants_ids.map(id => Number(id));
+    } else if (participants_id && Array.isArray(participants_id)) {
+      participantIds = participants_id.map(id => Number(id));
     } else if (participants_id) {
-      participantIds = [participants_id];
+      participantIds = [Number(participants_id)];
     } else {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Either participants_id or participants_ids array is required"
+        message: "Either participants_id (array or number) or participants_ids array is required"
       });
     }
 
-    if (participantIds.length === 0) {
+    // Add team_leader_id if provided and not already in the array
+    if (team_leader_id && !participantIds.includes(Number(team_leader_id))) {
+      participantIds.push(Number(team_leader_id));
+    }
+
+    // Validate all IDs are numbers
+    if (participantIds.some(id => isNaN(id))) {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "At least one participant ID is required"
+        message: "All participant IDs must be valid numbers"
       });
     }
 
-    if (!event_id) {
+    if (!event_id || typeof event_id !== 'string' || !event_id.trim()) {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Event ID is required"
+        message: "Event ID is required and must be a non-empty string"
       });
     }
 
-    if (isNaN(Number(event_id))) {
-      return res.status(400).json({
-        success: false,
-        error: "Validation failed",
-        message: "Event ID must be a valid number"
-      });
-    }
-
-    for (const pid of participantIds) {
-      if (isNaN(Number(pid))) {
-        return res.status(400).json({
-          success: false,
-          error: "Validation failed",
-          message: `Participant ID ${pid} must be a valid number`
-        });
-      }
-    }
-
-    if (team_leader_id && isNaN(Number(team_leader_id))) {
-      return res.status(400).json({
-        success: false,
-        error: "Validation failed",
-        message: "Team Leader ID must be a valid number"
-      });
-    }
-
-    const baseRegistrationData = {
-      event_id: Number(event_id)
+    const registrationData = {
+      event_id: event_id,
+      participants_id: participantIds,
+      team_name,
+      payment_id,
+      team_leader_id: team_leader_id ? Number(team_leader_id) : undefined
     };
 
-    if (team_name && typeof team_name === 'string' && team_name.trim()) {
-      baseRegistrationData.team_name = team_name.trim();
-    }
+    const registration = await Registration.create(registrationData);
 
-    if (payment_id && typeof payment_id === 'string' && payment_id.trim()) {
-      baseRegistrationData.payment_id = payment_id.trim();
-    }
-
-    if (team_leader_id) {
-      baseRegistrationData.team_leader_id = Number(team_leader_id);
-    }
-
-    const createdRegistrations = [];
-    const errors = [];
-
-    for (const participantId of participantIds) {
-      try {
-        const registrationData = {
-          ...baseRegistrationData,
-          participants_id: Number(participantId)
-        };
-
-        const registration = await Registration.create(registrationData);
-        createdRegistrations.push(registration);
-      } catch (error) {
-        errors.push({
-          participant_id: participantId,
-          error: error.message
-        });
-      }
-    }
-
-    if (createdRegistrations.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "All registrations failed",
-        errors: errors,
-        message: "No registrations were created"
-      });
-    } else if (errors.length > 0) {
-      return res.status(207).json({
-        success: true,
-        partial: true,
-        data: createdRegistrations,
-        errors: errors,
-        message: `${createdRegistrations.length} of ${participantIds.length} registrations created successfully`
-      });
-    } else {
-      return res.status(201).json({
-        success: true,
-        data: createdRegistrations,
-        count: createdRegistrations.length,
-        message: participantIds.length === 1 
-          ? "Registration created successfully" 
-          : `${participantIds.length} registrations created successfully`
-      });
-    }
+    return res.status(201).json({
+      success: true,
+      data: registration,
+      message: "Registration created successfully"
+    });
 
   } catch (error) {
     let statusCode = 400;
@@ -188,7 +124,7 @@ export const createRegistration = async (req, res) => {
     } else if (error.message.includes('Database error')) {
       statusCode = 500;
     }
-    
+
     res.status(statusCode).json({
       success: false,
       error: "Registration creation failed",
@@ -290,18 +226,18 @@ export const getEventRegistrationCount = async (req, res) => {
   try {
     const { event_id } = req.params;
     
-    if (!event_id || isNaN(parseInt(event_id))) {
+    if (!event_id || typeof event_id !== 'string' || !event_id.trim()) {
       return res.status(400).json({
         success: false,
         error: "Invalid event ID"
       });
     }
     
-    const count = await Registration.countByEventId(parseInt(event_id));
+    const count = await Registration.countByEventId(event_id); // pass as string
 
     res.json({
       success: true,
-      event_id: parseInt(event_id),
+      event_id: event_id,
       registration_count: count
     });
   } catch (error) {

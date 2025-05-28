@@ -13,13 +13,13 @@ export class Registration {
   static async testConnection() {
     try {
       const { data, error } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .select("count", { count: 'exact', head: true });
       
       if (error) return false;
       
       const { data: schemaData, error: schemaError } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .select("*")
         .limit(1);
         
@@ -33,8 +33,27 @@ export class Registration {
   static async create(registrationData) {
     try {
       const cleanData = {};
-      
-      const intFields = ['participants_id', 'event_id', 'team_leader_id'];
+
+      // participants_id as array of numbers (student IDs)
+      if (
+        Array.isArray(registrationData.participants_id) &&
+        registrationData.participants_id.length > 0
+      ) {
+        cleanData.participants_id = registrationData.participants_id.map(id => Number(id));
+        // Validate all IDs are numbers
+        if (cleanData.participants_id.some(id => isNaN(id))) {
+          throw new Error('All participant IDs must be valid numbers');
+        }
+      } else {
+        throw new Error('participants_id must be a non-empty array');
+      }
+
+      // event_id as string
+      if (registrationData.event_id !== undefined && registrationData.event_id !== null) {
+        cleanData.event_id = String(registrationData.event_id).trim();
+      }
+
+      const intFields = ['team_leader_id'];
       intFields.forEach(field => {
         if (registrationData[field] !== undefined && registrationData[field] !== null) {
           const numericValue = Number(registrationData[field]);
@@ -43,7 +62,7 @@ export class Registration {
           }
         }
       });
-      
+
       const textFields = ['team_name', 'payment_id'];
       textFields.forEach(field => {
         if (registrationData[field] !== undefined && registrationData[field] !== null) {
@@ -58,14 +77,17 @@ export class Registration {
         throw new Error('participants_id and event_id are required fields');
       }
 
-      await this.validateStudent(cleanData.participants_id);
-      
+      // Validate all students
+      for (const studentId of cleanData.participants_id) {
+        await this.validateStudent(studentId);
+      }
+
       if (cleanData.team_leader_id) {
         await this.validateStudent(cleanData.team_leader_id);
       }
 
       const { data, error } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .insert([cleanData])
         .select()
         .single();
@@ -115,7 +137,7 @@ export class Registration {
   static async getTableInfo() {
     try {
       const { data, error } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .select("*")
         .limit(0);
         
@@ -134,14 +156,14 @@ export class Registration {
       };
 
       const { data, error } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .insert([testData])
         .select()
         .single();
 
       if (data && data.id) {
         await supabase
-          .from("registrations")
+          .from("registration-service")
           .delete()
           .eq("id", data.id);
       }
@@ -154,7 +176,7 @@ export class Registration {
 
   static async findAll() {
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("*")
       .order('id', { ascending: false });
 
@@ -164,7 +186,7 @@ export class Registration {
 
   static async findById(id) {
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("*")
       .eq("id", id)
       .single();
@@ -180,7 +202,7 @@ export class Registration {
 
   static async findByParticipantId(participantId) {
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("*")
       .eq("participants_id", participantId)
       .order('id', { ascending: false });
@@ -191,9 +213,9 @@ export class Registration {
 
   static async findByEventId(eventId) {
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("*")
-      .eq("event_id", eventId)
+      .eq("event_id", eventId) // eventId is string
       .order('id', { ascending: false });
 
     if (error) throw error;
@@ -202,7 +224,7 @@ export class Registration {
 
   static async findByTeamLeaderId(teamLeaderId) {
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("*")
       .eq("team_leader_id", teamLeaderId)
       .order('id', { ascending: false });
@@ -213,7 +235,7 @@ export class Registration {
 
   static async findByTeamName(teamName) {
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("*")
       .eq("team_name", teamName)
       .order('id', { ascending: false });
@@ -224,7 +246,7 @@ export class Registration {
 
   static async isParticipantRegistered(participantId, eventId) {
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("id")
       .eq("participants_id", participantId)
       .eq("event_id", eventId)
@@ -239,7 +261,7 @@ export class Registration {
 
   static async getTeamMembers(eventId, teamName) {
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("*")
       .eq("event_id", eventId)
       .eq("team_name", teamName)
@@ -256,7 +278,7 @@ export class Registration {
       for (const registrationData of registrationsData) {
         const cleanData = {};
         
-        const intFields = ['participants_id', 'event_id', 'team_leader_id'];
+        const intFields = ['participants_id', 'team_leader_id'];
         intFields.forEach(field => {
           if (registrationData[field] !== undefined && registrationData[field] !== null) {
             const numericValue = Number(registrationData[field]);
@@ -266,6 +288,11 @@ export class Registration {
           }
         });
         
+        // event_id as string
+        if (registrationData.event_id !== undefined && registrationData.event_id !== null) {
+          cleanData.event_id = String(registrationData.event_id).trim();
+        }
+
         const textFields = ['team_name', 'payment_id'];
         textFields.forEach(field => {
           if (registrationData[field] !== undefined && registrationData[field] !== null) {
@@ -290,7 +317,7 @@ export class Registration {
       }
 
       const { data, error } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .insert(cleanedData)
         .select();
 
@@ -383,7 +410,7 @@ export class Registration {
     });
 
     const { data, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .update(cleanData)
       .eq("id", id)
       .select()
@@ -395,7 +422,7 @@ export class Registration {
 
   static async deleteById(id) {
     const { error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .delete()
       .eq("id", id);
 
@@ -405,9 +432,9 @@ export class Registration {
 
   static async countByEventId(eventId) {
     const { count, error } = await supabase
-      .from("registrations")
+      .from("registration-service")
       .select("*", { count: 'exact', head: true })
-      .eq("event_id", eventId);
+      .eq("event_id", eventId); // eventId is string
 
     if (error) throw error;
     return count;
@@ -416,13 +443,13 @@ export class Registration {
   static async getRegistrationStats() {
     try {
       const { count: totalCount, error: totalError } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .select("*", { count: 'exact', head: true });
 
       if (totalError) throw totalError;
 
       const { data: eventStats, error: eventError } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .select("event_id")
         .order("event_id");
 
@@ -434,7 +461,7 @@ export class Registration {
       });
 
       const { data: teamStats, error: teamError } = await supabase
-        .from("registrations")
+        .from("registration-service")
         .select("team_name")
         .not("team_name", "is", null);
 
