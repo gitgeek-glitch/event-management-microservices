@@ -13,7 +13,6 @@ const connectDB = async () => {
     console.error("Supabase credentials missing in .env");
     process.exit(1);
   }
-
   console.log("Connected to Supabase");
 };
 

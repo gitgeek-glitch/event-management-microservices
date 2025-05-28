@@ -19,11 +19,9 @@ export const testConnection = async (req, res) => {
 
 export const getAllStudents = async (req, res) => {
   try {
-    const { department, year, search } = req.query;
+    const { search } = req.query;
     const filters = {};
     
-    if (department) filters.department = department;
-    if (year) filters.year = year;
     if (search) filters.search = search;
 
     const students = await Student.findAll(filters);
@@ -44,49 +42,17 @@ export const getAllStudents = async (req, res) => {
 
 export const createStudent = async (req, res) => {
   try {
-    const {
-      student_id,
-      name,
-      email,
-      phone,
-      department,
-      year,
-      skills,
-      interests,
-      emergency_contact_name,
-      emergency_contact_phone,
-      dietary_requirements,
-      special_needs,
-      profile_picture
-    } = req.body;
+    const { name, usn, email, password } = req.body;
 
-    // Validation
-    if (!student_id || !name || !email || !department) {
+    if (!name || !usn || !email || !password) {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Student ID, name, email, and department are required"
+        message: "Name, USN, email, and password are required"
       });
     }
 
-    const studentData = {
-      student_id,
-      name,
-      email,
-      department
-    };
-
-    // Add optional fields
-    if (phone) studentData.phone = phone;
-    if (year) studentData.year = year;
-    if (skills) studentData.skills = skills;
-    if (interests) studentData.interests = interests;
-    if (emergency_contact_name) studentData.emergency_contact_name = emergency_contact_name;
-    if (emergency_contact_phone) studentData.emergency_contact_phone = emergency_contact_phone;
-    if (dietary_requirements) studentData.dietary_requirements = dietary_requirements;
-    if (special_needs) studentData.special_needs = special_needs;
-    if (profile_picture) studentData.profile_picture = profile_picture;
-
+    const studentData = { name, usn, email, password };
     const student = await Student.create(studentData);
 
     res.status(201).json({
@@ -143,18 +109,51 @@ export const getStudentById = async (req, res) => {
   }
 };
 
-export const getStudentByStudentId = async (req, res) => {
+export const getStudentByEmail = async (req, res) => {
   try {
-    const { student_id } = req.params;
+    const { email } = req.params;
     
-    if (!student_id || typeof student_id !== 'string' || student_id.trim() === '') {
+    if (!email || typeof email !== 'string' || email.trim() === '') {
       return res.status(400).json({
         success: false,
-        error: "Invalid student ID"
+        error: "Invalid email"
       });
     }
     
-    const student = await Student.findByStudentId(student_id);
+    const student = await Student.findByEmail(email);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        error: "Student not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: student
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Error fetching student",
+      message: error.message
+    });
+  }
+};
+
+export const getStudentByUsn = async (req, res) => {
+  try {
+    const { usn } = req.params;
+    
+    if (!usn || typeof usn !== 'string' || usn.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid USN"
+      });
+    }
+    
+    const student = await Student.findByUsn(usn);
 
     if (!student) {
       return res.status(404).json({
@@ -181,10 +180,7 @@ export const updateStudent = async (req, res) => {
     const { id } = req.params;
     const updateData = { ...req.body };
 
-    // Remove fields that shouldn't be updated
     delete updateData.id;
-    delete updateData.created_at;
-    delete updateData.updated_at;
 
     if (!id || isNaN(parseInt(id))) {
       return res.status(400).json({
@@ -227,97 +223,16 @@ export const deleteStudent = async (req, res) => {
       });
     }
     
-    const student = await Student.deleteById(id);
+    await Student.deleteById(id);
 
     res.json({
       success: true,
-      data: student,
-      message: "Student deactivated successfully"
+      message: "Student deleted successfully"
     });
   } catch (error) {
     res.status(400).json({
       success: false,
       error: "Error deleting student",
-      message: error.message
-    });
-  }
-};
-
-export const hardDeleteStudent = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid student ID"
-      });
-    }
-    
-    await Student.hardDeleteById(id);
-
-    res.json({
-      success: true,
-      message: "Student permanently deleted"
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: "Error permanently deleting student",
-      message: error.message
-    });
-  }
-};
-
-export const getStudentsByDepartment = async (req, res) => {
-  try {
-    const { department } = req.params;
-    
-    if (!department) {
-      return res.status(400).json({
-        success: false,
-        error: "Department is required"
-      });
-    }
-    
-    const students = await Student.findByDepartment(department);
-
-    res.json({
-      success: true,
-      count: students.length,
-      data: students
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: "Error fetching students by department",
-      message: error.message
-    });
-  }
-};
-
-export const getStudentsByYear = async (req, res) => {
-  try {
-    const { year } = req.params;
-    
-    if (!year || isNaN(parseInt(year))) {
-      return res.status(400).json({
-        success: false,
-        error: "Valid year is required"
-      });
-    }
-    
-    const students = await Student.findByYear(year);
-
-    res.json({
-      success: true,
-      count: students.length,
-      data: students
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: "Error fetching students by year",
       message: error.message
     });
   }
@@ -362,6 +277,40 @@ export const getStudentStats = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Error fetching student statistics",
+      message: error.message
+    });
+  }
+};
+
+export const authenticateStudent = async (req, res) => {
+  try {
+    const { usn, password } = req.body;
+
+    if (!usn || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "USN and password are required"
+      });
+    }
+
+    const student = await Student.authenticate(usn, password);
+
+    if (!student) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid credentials"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: student,
+      message: "Authentication successful"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Authentication failed",
       message: error.message
     });
   }
