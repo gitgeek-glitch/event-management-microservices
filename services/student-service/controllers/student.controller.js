@@ -1,4 +1,6 @@
 import { Student } from "../models/student.model.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 export const testConnection = async (req, res) => {
   try {
@@ -71,6 +73,119 @@ export const createStudent = async (req, res) => {
     res.status(statusCode).json({
       success: false,
       error: "Student creation failed",
+      message: error.message
+    });
+  }
+};
+
+export const signup = async (req, res) => {
+  try {
+    const { name, usn, email, password } = req.body;
+
+    if (!name || !usn || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        message: "Name, USN, email, and password are required"
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        message: "Password must be at least 6 characters long"
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const studentData = { name, usn, email, password: hashedPassword };
+    const student = await Student.create(studentData);
+
+    const token = jwt.sign(
+      { id: student.id, usn: student.usn, email: student.email },
+      process.env.JWT_SECRET || 'default_secret',
+      { expiresIn: '24h' }
+    );
+
+    const studentResponse = { ...student };
+    delete studentResponse.password;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        student: studentResponse,
+        token
+      },
+      message: "Student registered successfully"
+    });
+  } catch (error) {
+    let statusCode = 400;
+    if (error.message.includes('already exists')) {
+      statusCode = 409;
+    } else if (error.message.includes('Invalid email')) {
+      statusCode = 422;
+    }
+
+    res.status(statusCode).json({
+      success: false,
+      error: "Registration failed",
+      message: error.message
+    });
+  }
+};
+
+export const login = async (req, res) => {
+  try {
+    const { usn, password } = req.body;
+
+    if (!usn || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        message: "USN and password are required"
+      });
+    }
+
+    const student = await Student.findByUsn(usn);
+    if (!student) {
+      return res.status(401).json({
+        success: false,
+        error: "Authentication failed",
+        message: "Invalid credentials"
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, student.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: "Authentication failed",
+        message: "Invalid credentials"
+      });
+    }
+
+    const token = jwt.sign(
+      { id: student.id, usn: student.usn, email: student.email },
+      process.env.JWT_SECRET || 'default_secret',
+      { expiresIn: '24h' }
+    );
+
+    const studentResponse = { ...student };
+    delete studentResponse.password;
+
+    res.json({
+      success: true,
+      data: {
+        student: studentResponse,
+        token
+      },
+      message: "Login successful"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Login failed",
       message: error.message
     });
   }
@@ -187,6 +302,10 @@ export const updateStudent = async (req, res) => {
         success: false,
         error: "Invalid student ID"
       });
+    }
+
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
     }
 
     const student = await Student.updateById(id, updateData);
@@ -311,6 +430,34 @@ export const authenticateStudent = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Authentication failed",
+      message: error.message
+    });
+  }
+};
+
+export const getProfile = async (req, res) => {
+  try {
+    const studentId = req.student.id;
+    const student = await Student.findById(studentId);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        error: "Student not found"
+      });
+    }
+
+    const studentResponse = { ...student };
+    delete studentResponse.password;
+
+    res.json({
+      success: true,
+      data: studentResponse
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Error fetching profile",
       message: error.message
     });
   }

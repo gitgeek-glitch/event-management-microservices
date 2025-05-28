@@ -7,9 +7,7 @@ import {
   updateRegistration,
   deleteRegistration,
   getEventRegistrationCount,
-  createBulkRegistrations,
-  getRegistrationsByTeam,
-  deleteMultipleRegistrations
+  getRegistrationsByTeam
 } from "../controllers/registration.controller.js";
 
 const router = express.Router();
@@ -21,11 +19,9 @@ router.get("/event/:event_id/count", getEventRegistrationCount);
 router.get("/team/:team_name", getRegistrationsByTeam);
 
 router.post("/", createRegistration);
-router.post("/bulk", createBulkRegistrations);
 
 router.put("/:id", updateRegistration);
 
-router.delete("/bulk", deleteMultipleRegistrations);
 router.delete("/:id", deleteRegistration);
 
 export default router;

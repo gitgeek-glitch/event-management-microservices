@@ -150,8 +150,8 @@ export class Registration {
   static async testInsert() {
     try {
       const testData = {
-        participants_id: 99999,
-        event_id: 99999,
+        participants_id: [99999],
+        event_id: 'TEST_EVENT',
         team_name: 'TEST_TEAM'
       };
 
@@ -204,7 +204,7 @@ export class Registration {
     const { data, error } = await supabase
       .from("registration-service")
       .select("*")
-      .eq("participants_id", participantId)
+      .contains("participants_id", [parseInt(participantId)])
       .order('id', { ascending: false });
 
     if (error) throw error;
@@ -215,7 +215,7 @@ export class Registration {
     const { data, error } = await supabase
       .from("registration-service")
       .select("*")
-      .eq("event_id", eventId) // eventId is string
+      .eq("event_id", eventId)
       .order('id', { ascending: false });
 
     if (error) throw error;
@@ -244,163 +244,33 @@ export class Registration {
     return data.map(registration => new Registration(registration));
   }
 
-  static async isParticipantRegistered(participantId, eventId) {
-    const { data, error } = await supabase
-      .from("registration-service")
-      .select("id")
-      .eq("participants_id", participantId)
-      .eq("event_id", eventId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
-    
-    return !!data;
-  }
-
-  static async getTeamMembers(eventId, teamName) {
-    const { data, error } = await supabase
-      .from("registration-service")
-      .select("*")
-      .eq("event_id", eventId)
-      .eq("team_name", teamName)
-      .order('id', { ascending: true });
-
-    if (error) throw error;
-    return data.map(registration => new Registration(registration));
-  }
-
-  static async createMultiple(registrationsData) {
-    try {
-      const cleanedData = [];
-      
-      for (const registrationData of registrationsData) {
-        const cleanData = {};
-        
-        const intFields = ['participants_id', 'team_leader_id'];
-        intFields.forEach(field => {
-          if (registrationData[field] !== undefined && registrationData[field] !== null) {
-            const numericValue = Number(registrationData[field]);
-            if (!isNaN(numericValue)) {
-              cleanData[field] = numericValue;
-            }
-          }
-        });
-        
-        // event_id as string
-        if (registrationData.event_id !== undefined && registrationData.event_id !== null) {
-          cleanData.event_id = String(registrationData.event_id).trim();
-        }
-
-        const textFields = ['team_name', 'payment_id'];
-        textFields.forEach(field => {
-          if (registrationData[field] !== undefined && registrationData[field] !== null) {
-            const value = String(registrationData[field]).trim();
-            if (value !== '') {
-              cleanData[field] = value;
-            }
-          }
-        });
-
-        if (!cleanData.participants_id || !cleanData.event_id) {
-          throw new Error('participants_id and event_id are required fields for all registrations');
-        }
-
-        await this.validateStudent(cleanData.participants_id);
-        
-        if (cleanData.team_leader_id) {
-          await this.validateStudent(cleanData.team_leader_id);
-        }
-
-        cleanedData.push(cleanData);
-      }
-
-      const { data, error } = await supabase
-        .from("registration-service")
-        .insert(cleanedData)
-        .select();
-
-      if (error) {
-        let errorMessage = 'Database error';
-        if (error.code === '23505') {
-          errorMessage = 'One or more registrations already exist';
-        } else if (error.code === '23503') {
-          errorMessage = 'One or more referenced students or events do not exist';
-        } else if (error.code === '23514') {
-          errorMessage = 'Data validation failed';
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-        throw new Error(`${errorMessage}: ${error.details || 'No additional details'}`);
-      }
-
-      return data.map(registration => new Registration(registration));
-    } catch (err) {
-      throw err;
-    }
-  }
-
-  static async updateMultiple(updates) {
-    const results = [];
-    const errors = [];
-
-    for (const update of updates) {
-      try {
-        if (!update.id) {
-          throw new Error('Registration ID is required for update');
-        }
-        
-        const registration = await this.updateById(update.id, update.data);
-        results.push(registration);
-      } catch (error) {
-        errors.push({
-          id: update.id,
-          error: error.message
-        });
-      }
-    }
-
-    return {
-      successful: results,
-      failed: errors
-    };
-  }
-
-  static async deleteMultiple(ids) {
-    const results = [];
-    const errors = [];
-
-    for (const id of ids) {
-      try {
-        await this.deleteById(id);
-        results.push(id);
-      } catch (error) {
-        errors.push({
-          id: id,
-          error: error.message
-        });
-      }
-    }
-
-    return {
-      deleted: results,
-      failed: errors
-    };
-  }
-
   static async updateById(id, updateData) {
     const cleanData = {};
     
-    const intFields = ['participants_id', 'event_id', 'team_leader_id'];
-    intFields.forEach(field => {
-      if (updateData[field] !== undefined && updateData[field] !== null) {
-        const numericValue = Number(updateData[field]);
-        if (!isNaN(numericValue)) {
-          cleanData[field] = numericValue;
+    // Handle participants_id array
+    if (updateData.participants_id !== undefined) {
+      if (Array.isArray(updateData.participants_id)) {
+        cleanData.participants_id = updateData.participants_id.map(id => Number(id));
+        if (cleanData.participants_id.some(id => isNaN(id))) {
+          throw new Error('All participant IDs must be valid numbers');
         }
+      } else if (updateData.participants_id !== null) {
+        throw new Error('participants_id must be an array');
       }
-    });
+    }
+    
+    // Handle event_id as string
+    if (updateData.event_id !== undefined && updateData.event_id !== null) {
+      cleanData.event_id = String(updateData.event_id).trim();
+    }
+    
+    // Handle team_leader_id as number
+    if (updateData.team_leader_id !== undefined && updateData.team_leader_id !== null) {
+      const numericValue = Number(updateData.team_leader_id);
+      if (!isNaN(numericValue)) {
+        cleanData.team_leader_id = numericValue;
+      }
+    }
     
     const textFields = ['team_name', 'payment_id'];
     textFields.forEach(field => {
@@ -434,7 +304,7 @@ export class Registration {
     const { count, error } = await supabase
       .from("registration-service")
       .select("*", { count: 'exact', head: true })
-      .eq("event_id", eventId); // eventId is string
+      .eq("event_id", eventId);
 
     if (error) throw error;
     return count;

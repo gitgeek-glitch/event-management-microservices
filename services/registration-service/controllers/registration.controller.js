@@ -54,7 +54,6 @@ export const createRegistration = async (req, res) => {
   try {
     const {
       participants_id,
-      participants_ids,
       event_id,
       team_name,
       payment_id,
@@ -63,9 +62,7 @@ export const createRegistration = async (req, res) => {
 
     let participantIds = [];
 
-    if (participants_ids && Array.isArray(participants_ids)) {
-      participantIds = participants_ids.map(id => Number(id));
-    } else if (participants_id && Array.isArray(participants_id)) {
+    if (Array.isArray(participants_id)) {
       participantIds = participants_id.map(id => Number(id));
     } else if (participants_id) {
       participantIds = [Number(participants_id)];
@@ -73,7 +70,7 @@ export const createRegistration = async (req, res) => {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Either participants_id (array or number) or participants_ids array is required"
+        message: "participants_id is required (can be a number or array of numbers)"
       });
     }
 
@@ -233,7 +230,7 @@ export const getEventRegistrationCount = async (req, res) => {
       });
     }
     
-    const count = await Registration.countByEventId(event_id); // pass as string
+    const count = await Registration.countByEventId(event_id);
 
     res.json({
       success: true,
@@ -244,69 +241,6 @@ export const getEventRegistrationCount = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Error fetching registration count",
-      message: error.message
-    });
-  }
-};
-
-export const createBulkRegistrations = async (req, res) => {
-  try {
-    const { registrations } = req.body;
-
-    if (!Array.isArray(registrations) || registrations.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "Validation failed",
-        message: "registrations array is required and must not be empty"
-      });
-    }
-
-    const results = [];
-    const errors = [];
-
-    for (let i = 0; i < registrations.length; i++) {
-      const regData = registrations[i];
-      try {
-        if (!regData.participants_id || !regData.event_id) {
-          throw new Error(`Registration ${i}: participants_id and event_id are required`);
-        }
-
-        const registration = await Registration.create(regData);
-        results.push({
-          index: i,
-          registration: registration
-        });
-      } catch (error) {
-        errors.push({
-          index: i,
-          data: regData,
-          error: error.message
-        });
-      }
-    }
-
-    if (results.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "All bulk registrations failed",
-        errors: errors
-      });
-    }
-
-    res.status(errors.length > 0 ? 207 : 201).json({
-      success: true,
-      partial: errors.length > 0,
-      data: results.map(r => r.registration),
-      successful_count: results.length,
-      failed_count: errors.length,
-      errors: errors.length > 0 ? errors : undefined,
-      message: `${results.length} of ${registrations.length} registrations created successfully`
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: "Bulk registration failed",
       message: error.message
     });
   }
@@ -334,54 +268,6 @@ export const getRegistrationsByTeam = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Error fetching team registrations",
-      message: error.message
-    });
-  }
-};
-
-export const deleteMultipleRegistrations = async (req, res) => {
-  try {
-    const { ids } = req.body;
-
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "Registration IDs array is required"
-      });
-    }
-
-    const results = [];
-    const errors = [];
-
-    for (const id of ids) {
-      try {
-        if (isNaN(parseInt(id))) {
-          throw new Error(`Invalid registration ID: ${id}`);
-        }
-        
-        await Registration.deleteById(id);
-        results.push(id);
-      } catch (error) {
-        errors.push({
-          id: id,
-          error: error.message
-        });
-      }
-    }
-
-    res.json({
-      success: true,
-      deleted_count: results.length,
-      failed_count: errors.length,
-      deleted_ids: results,
-      errors: errors.length > 0 ? errors : undefined,
-      message: `${results.length} of ${ids.length} registrations deleted successfully`
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: "Bulk deletion failed",
       message: error.message
     });
   }
