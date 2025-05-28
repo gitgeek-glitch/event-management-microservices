@@ -8,15 +8,12 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
 app.use("/api/students", studentRoutes);
 
-// Health check
 app.get("/health", (req, res) => {
   res.json({
     success: true,
@@ -27,7 +24,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Root endpoint
 app.get("/", (req, res) => {
   res.json({
     success: true,
@@ -36,14 +32,13 @@ app.get("/", (req, res) => {
     endpoints: {
       health: "/health",
       students: "/api/students",
-      test: "/api/students/test"
+      test: "/api/students/test",
+      auth: "/api/students/auth"
     }
   });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
   res.status(500).json({
     success: false,
     error: "Internal Server Error",
@@ -51,7 +46,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
 app.use("*", (req, res) => {
   res.status(404).json({
     success: false,
@@ -62,7 +56,6 @@ app.use("*", (req, res) => {
 
 const PORT = process.env.PORT || 3002;
 
-// Start server
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Student Service running on port ${PORT}`);

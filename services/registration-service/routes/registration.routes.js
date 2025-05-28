@@ -6,10 +6,10 @@ import {
   getRegistrationById,
   updateRegistration,
   deleteRegistration,
-  confirmRegistration,
-  cancelRegistration,
-  updatePaymentStatus,
-  getEventRegistrationCount
+  getEventRegistrationCount,
+  createBulkRegistrations,
+  getRegistrationsByTeam,
+  deleteMultipleRegistrations
 } from "../controllers/registration.controller.js";
 
 const router = express.Router();
@@ -20,11 +20,9 @@ router.post("/", createRegistration);
 router.get("/:id", getRegistrationById);
 router.put("/:id", updateRegistration);
 router.delete("/:id", deleteRegistration);
-
-router.patch("/:id/confirm", confirmRegistration);
-router.patch("/:id/cancel", cancelRegistration);
-router.patch("/:id/payment", updatePaymentStatus);
-
 router.get("/event/:event_id/count", getEventRegistrationCount);
+router.post("/bulk", createBulkRegistrations);
+router.get("/team/:team_name", getRegistrationsByTeam);
+router.delete("/bulk", deleteMultipleRegistrations);
 
 export default router;

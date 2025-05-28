@@ -23,19 +23,17 @@ export const testConnection = async (req, res) => {
 
 export const getAllRegistrations = async (req, res) => {
   try {
-    const { student_id, event_id, status } = req.query;
+    const { participants_id, event_id, team_leader_id } = req.query;
     let registrations;
 
-    if (student_id) {
-      registrations = await Registration.findByStudentId(student_id);
+    if (participants_id) {
+      registrations = await Registration.findByParticipantId(participants_id);
     } else if (event_id) {
       registrations = await Registration.findByEventId(event_id);
+    } else if (team_leader_id) {
+      registrations = await Registration.findByTeamLeaderId(team_leader_id);
     } else {
       registrations = await Registration.findAll();
-    }
-
-    if (status) {
-      registrations = registrations.filter(reg => reg.status === status);
     }
 
     res.json({
@@ -55,123 +53,146 @@ export const getAllRegistrations = async (req, res) => {
 export const createRegistration = async (req, res) => {
   try {
     const {
-      student_id,
+      participants_id,
+      participants_ids,
       event_id,
-      session_ids,
       team_name,
-      team_member1_id,
-      team_member2_id,
-      team_member3_id,
-      team_member4_id,
-      emergency_contact,
-      dietary_requirements,
-      special_needs
+      payment_id,
+      team_leader_id
     } = req.body;
 
-    if (!student_id || !event_id) {
+    let participantIds = [];
+    
+    if (participants_ids && Array.isArray(participants_ids)) {
+      participantIds = participants_ids;
+    } else if (participants_id) {
+      participantIds = [participants_id];
+    } else {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Student ID and Event ID are required"
+        message: "Either participants_id or participants_ids array is required"
       });
     }
 
-    // Validate student_id is string
-    if (typeof student_id !== 'string' || student_id.trim() === '') {
+    if (participantIds.length === 0) {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Student ID must be a valid string"
+        message: "At least one participant ID is required"
       });
     }
 
-    // event_id is now text, so validate as string
-    if (typeof event_id !== 'string' || event_id.trim() === '') {
+    if (!event_id) {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Event ID must be a valid string"
+        message: "Event ID is required"
       });
     }
 
-    // session_ids is now text, so validate as string if provided
-    if (session_ids && (typeof session_ids !== 'string' || session_ids.trim() === '')) {
+    if (isNaN(Number(event_id))) {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Session IDs must be a valid string"
+        message: "Event ID must be a valid number"
       });
     }
 
-    // emergency_contact is numeric, so validate as number if provided
-    if (emergency_contact && isNaN(Number(emergency_contact))) {
+    for (const pid of participantIds) {
+      if (isNaN(Number(pid))) {
+        return res.status(400).json({
+          success: false,
+          error: "Validation failed",
+          message: `Participant ID ${pid} must be a valid number`
+        });
+      }
+    }
+
+    if (team_leader_id && isNaN(Number(team_leader_id))) {
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        message: "Emergency contact must be a valid number"
+        message: "Team Leader ID must be a valid number"
       });
     }
 
-    const registrationData = {
-      student_id: student_id.trim(),
-      event_id: event_id.trim(),
-      status: 'pending',
-      payment_status: 'pending'
+    const baseRegistrationData = {
+      event_id: Number(event_id)
     };
 
-    // Add optional text fields
-    if (session_ids && typeof session_ids === 'string' && session_ids.trim()) {
-      registrationData.session_ids = session_ids.trim();
-    }
     if (team_name && typeof team_name === 'string' && team_name.trim()) {
-      registrationData.team_name = team_name.trim();
-    }
-    if (team_member1_id && typeof team_member1_id === 'string' && team_member1_id.trim()) {
-      registrationData.team_member1_id = team_member1_id.trim();
-    }
-    if (team_member2_id && typeof team_member2_id === 'string' && team_member2_id.trim()) {
-      registrationData.team_member2_id = team_member2_id.trim();
-    }
-    if (team_member3_id && typeof team_member3_id === 'string' && team_member3_id.trim()) {
-      registrationData.team_member3_id = team_member3_id.trim();
-    }
-    if (team_member4_id && typeof team_member4_id === 'string' && team_member4_id.trim()) {
-      registrationData.team_member4_id = team_member4_id.trim();
-    }
-    if (dietary_requirements && typeof dietary_requirements === 'string' && dietary_requirements.trim()) {
-      registrationData.dietary_requirements = dietary_requirements.trim();
-    }
-    if (special_needs && typeof special_needs === 'string' && special_needs.trim()) {
-      registrationData.special_needs = special_needs.trim();
+      baseRegistrationData.team_name = team_name.trim();
     }
 
-    // Add numeric field
-    if (emergency_contact && !isNaN(Number(emergency_contact))) {
-      registrationData.emergency_contact = Number(emergency_contact);
+    if (payment_id && typeof payment_id === 'string' && payment_id.trim()) {
+      baseRegistrationData.payment_id = payment_id.trim();
     }
 
-    const registration = await Registration.create(registrationData);
+    if (team_leader_id) {
+      baseRegistrationData.team_leader_id = Number(team_leader_id);
+    }
 
-    res.status(201).json({
-      success: true,
-      data: registration,
-      message: "Registration created successfully"
-    });
+    const createdRegistrations = [];
+    const errors = [];
+
+    for (const participantId of participantIds) {
+      try {
+        const registrationData = {
+          ...baseRegistrationData,
+          participants_id: Number(participantId)
+        };
+
+        const registration = await Registration.create(registrationData);
+        createdRegistrations.push(registration);
+      } catch (error) {
+        errors.push({
+          participant_id: participantId,
+          error: error.message
+        });
+      }
+    }
+
+    if (createdRegistrations.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "All registrations failed",
+        errors: errors,
+        message: "No registrations were created"
+      });
+    } else if (errors.length > 0) {
+      return res.status(207).json({
+        success: true,
+        partial: true,
+        data: createdRegistrations,
+        errors: errors,
+        message: `${createdRegistrations.length} of ${participantIds.length} registrations created successfully`
+      });
+    } else {
+      return res.status(201).json({
+        success: true,
+        data: createdRegistrations,
+        count: createdRegistrations.length,
+        message: participantIds.length === 1 
+          ? "Registration created successfully" 
+          : `${participantIds.length} registrations created successfully`
+      });
+    }
+
   } catch (error) {
     let statusCode = 400;
     if (error.message.includes('already exists')) {
       statusCode = 409;
     } else if (error.message.includes('does not exist')) {
       statusCode = 422;
-    } else if (error.message.includes('Database error') || error.message.includes('Unknown database error')) {
+    } else if (error.message.includes('Database error')) {
       statusCode = 500;
     }
     
     res.status(statusCode).json({
       success: false,
       error: "Registration creation failed",
-      message: error.message,
-      details: error.details || null
+      message: error.message
     });
   }
 };
@@ -215,9 +236,6 @@ export const updateRegistration = async (req, res) => {
     const updateData = { ...req.body };
 
     delete updateData.id;
-    delete updateData.created_at;
-    delete updateData.updated_at;
-    delete updateData.registration_date;
 
     if (!id || isNaN(parseInt(id))) {
       return res.status(400).json({
@@ -268,118 +286,166 @@ export const deleteRegistration = async (req, res) => {
   }
 };
 
-export const confirmRegistration = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid registration ID"
-      });
-    }
-    
-    const registration = await Registration.updateById(id, { status: 'confirmed' });
-
-    res.json({
-      success: true,
-      data: registration,
-      message: "Registration confirmed successfully"
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: "Error confirming registration",
-      message: error.message
-    });
-  }
-};
-
-export const cancelRegistration = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid registration ID"
-      });
-    }
-    
-    const registration = await Registration.updateById(id, { status: 'cancelled' });
-
-    res.json({
-      success: true,
-      data: registration,
-      message: "Registration cancelled successfully"
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: "Error cancelling registration",
-      message: error.message
-    });
-  }
-};
-
-export const updatePaymentStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { payment_status } = req.body;
-
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid registration ID"
-      });
-    }
-
-    if (!payment_status) {
-      return res.status(400).json({
-        success: false,
-        error: "Payment status is required"
-      });
-    }
-
-    const registration = await Registration.updatePaymentStatus(id, payment_status);
-
-    res.json({
-      success: true,
-      data: registration,
-      message: "Payment status updated successfully"
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: "Error updating payment status",
-      message: error.message
-    });
-  }
-};
-
 export const getEventRegistrationCount = async (req, res) => {
   try {
     const { event_id } = req.params;
     
-    // event_id is now text, so validate as string
-    if (!event_id || typeof event_id !== 'string' || event_id.trim() === '') {
+    if (!event_id || isNaN(parseInt(event_id))) {
       return res.status(400).json({
         success: false,
         error: "Invalid event ID"
       });
     }
     
-    const count = await Registration.countByEventId(event_id);
+    const count = await Registration.countByEventId(parseInt(event_id));
 
     res.json({
       success: true,
-      event_id: event_id.trim(),
-      confirmed_registrations: count
+      event_id: parseInt(event_id),
+      registration_count: count
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       error: "Error fetching registration count",
+      message: error.message
+    });
+  }
+};
+
+export const createBulkRegistrations = async (req, res) => {
+  try {
+    const { registrations } = req.body;
+
+    if (!Array.isArray(registrations) || registrations.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        message: "registrations array is required and must not be empty"
+      });
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (let i = 0; i < registrations.length; i++) {
+      const regData = registrations[i];
+      try {
+        if (!regData.participants_id || !regData.event_id) {
+          throw new Error(`Registration ${i}: participants_id and event_id are required`);
+        }
+
+        const registration = await Registration.create(regData);
+        results.push({
+          index: i,
+          registration: registration
+        });
+      } catch (error) {
+        errors.push({
+          index: i,
+          data: regData,
+          error: error.message
+        });
+      }
+    }
+
+    if (results.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "All bulk registrations failed",
+        errors: errors
+      });
+    }
+
+    res.status(errors.length > 0 ? 207 : 201).json({
+      success: true,
+      partial: errors.length > 0,
+      data: results.map(r => r.registration),
+      successful_count: results.length,
+      failed_count: errors.length,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `${results.length} of ${registrations.length} registrations created successfully`
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Bulk registration failed",
+      message: error.message
+    });
+  }
+};
+
+export const getRegistrationsByTeam = async (req, res) => {
+  try {
+    const { team_name } = req.params;
+    
+    if (!team_name || team_name.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid team name"
+      });
+    }
+    
+    const registrations = await Registration.findByTeamName(team_name);
+
+    res.json({
+      success: true,
+      count: registrations.length,
+      data: registrations
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Error fetching team registrations",
+      message: error.message
+    });
+  }
+};
+
+export const deleteMultipleRegistrations = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Registration IDs array is required"
+      });
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const id of ids) {
+      try {
+        if (isNaN(parseInt(id))) {
+          throw new Error(`Invalid registration ID: ${id}`);
+        }
+        
+        await Registration.deleteById(id);
+        results.push(id);
+      } catch (error) {
+        errors.push({
+          id: id,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      deleted_count: results.length,
+      failed_count: errors.length,
+      deleted_ids: results,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `${results.length} of ${ids.length} registrations deleted successfully`
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Bulk deletion failed",
       message: error.message
     });
   }

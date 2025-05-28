@@ -6,7 +6,6 @@ dotenv.config();
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 
-// Add validation and error handling
 const connectDB = async () => {
   if (!supabaseUrl || !supabaseKey) {
     console.error("Supabase credentials missing in .env");
@@ -14,7 +13,6 @@ const connectDB = async () => {
     process.exit(1);
   }
 
-  // Validate URL format
   try {
     new URL(supabaseUrl);
   } catch (error) {
@@ -23,7 +21,6 @@ const connectDB = async () => {
     process.exit(1);
   }
 
-  // Validate key format (basic check)
   if (supabaseKey.length < 20) {
     console.error("Invalid SUPABASE_KEY - key appears too short");
     process.exit(1);
@@ -32,7 +29,6 @@ const connectDB = async () => {
   console.log("Connected to Supabase");
 };
 
-// Initialize Supabase client with error handling
 let supabase;
 try {
   if (supabaseUrl && supabaseKey) {
