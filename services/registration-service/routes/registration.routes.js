@@ -16,13 +16,16 @@ const router = express.Router();
 
 router.get("/test", testConnection);
 router.get("/", getAllRegistrations);
-router.post("/", createRegistration);
 router.get("/:id", getRegistrationById);
-router.put("/:id", updateRegistration);
-router.delete("/:id", deleteRegistration);
 router.get("/event/:event_id/count", getEventRegistrationCount);
-router.post("/bulk", createBulkRegistrations);
 router.get("/team/:team_name", getRegistrationsByTeam);
+
+router.post("/", createRegistration);
+router.post("/bulk", createBulkRegistrations);
+
+router.put("/:id", updateRegistration);
+
 router.delete("/bulk", deleteMultipleRegistrations);
+router.delete("/:id", deleteRegistration);
 
 export default router;

@@ -19,12 +19,15 @@ router.get("/test", testConnection);
 router.get("/stats", getStudentStats);
 router.get("/search", searchStudents);
 router.get("/", getAllStudents);
-router.post("/", createStudent);
-router.post("/auth", authenticateStudent);
 router.get("/id/:id", getStudentById);
 router.get("/email/:email", getStudentByEmail);
 router.get("/usn/:usn", getStudentByUsn);
+
+router.post("/", createStudent);
+router.post("/auth", authenticateStudent);
+
 router.put("/:id", updateStudent);
+
 router.delete("/:id", deleteStudent);
 
 export default router;
