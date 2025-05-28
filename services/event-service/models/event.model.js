@@ -8,9 +8,7 @@ const eventSchema = new mongoose.Schema({
     enum: ["Hackathon", "Workshop", "Webinar", "Competition"],
   },
   venue: String,
-  schedule: Date,
-  capacity: Number,
-  eligibility: String,
+  schedule: Date,  
 });
 
 const Event = mongoose.model("Event", eventSchema);
