@@ -3,46 +3,33 @@ import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
 
-const EVENT_SERVICE_URL = process.env.EVENT_SERVICE_URL;
-
-export const getAllSessions = async (req, res) => {
-  try {
-    const sessions = await Session.find();
-
-    const enrichedSessions = await Promise.all(
-      sessions.map(async (session) => {
-        try {
-          const response = await axios.get(`${EVENT_SERVICE_URL}/${session.eventId}`);
-          const event = response.data;
-
-          return {
-            ...session.toObject(),
-            eventTitle: event.title,
-            eventType: event.type
-          };
-        } catch (err) {
-          // If event not found, return session without enrichment
-          return {
-            ...session.toObject(),
-            eventTitle: "Unknown Event",
-            eventType: "Unknown"
-          };
-        }
-      })
-    );
-
-    res.json(enrichedSessions);
-  } catch (error) {
-    res.status(500).json({ error: "Error fetching sessions" });
-  }
-};
-
 export const createSession = async (req, res) => {
   try {
     const newSession = new Session(req.body);
+    console.log("New: ", newSession);
     const saved = await newSession.save();
+    console.log("Saved: ", saved);    
     res.status(201).json(saved);
   } catch (error) {
+    console.log(error);
+    
     res.status(400).json({ error: "Invalid session data" });
+  }
+};
+
+export const getSessionByEventId = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const session = await Session.findOne({ eventId });
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found for the given eventId" });
+    }
+
+    return res.json(session);
+
+  } catch (error) {
+    res.status(400).json({ error: "Invalid eventId format or request" });
   }
 };
