@@ -18,3 +18,18 @@ export const createEvent = async (req, res) => {
     res.status(400).json({ error: "Invalid event data" });
   }
 };
+
+export const getEventById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const event = await Event.findById(id);
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    res.json(event);
+  } catch (error) {
+    res.status(400).json({ error: "Invalid event ID" });
+  }
+};

@@ -2,7 +2,11 @@ import mongoose from "mongoose";
 
 const sessionSchema = new mongoose.Schema({
   eventId: {
-    type: String, // Just store the event's ObjectId as a string
+    type: String, 
+    required: true
+  },
+  registerationId: {
+    type: Number, 
     required: true
   },
   winner: {
