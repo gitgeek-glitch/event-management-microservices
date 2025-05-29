@@ -7,7 +7,7 @@ const sessionSchema = new mongoose.Schema({
     unique: true
   },
   winner: {
-    type: String,
+    type: Number,
     required: true
   },
   scores: [

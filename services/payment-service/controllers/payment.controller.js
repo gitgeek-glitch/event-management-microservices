@@ -121,9 +121,9 @@ export const createPaymentOrder = async (req, res) => {
       orderId,
       razorpayOrderId: razorpayOrder.id,
       amount: Number(amount),
-      studentId: String(studentId),
+      studentId: studentId,
       eventId: String(eventId),
-      registrationId: String(registrationId),
+      registrationId: registrationId,
       status: "created",
       notes: notes || {}
     });

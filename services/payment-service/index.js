@@ -30,8 +30,8 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'x-razorpay-signature']
 };
 
-// app.use(cors(corsOptions));
-app.use(cors);
+app.use(cors(corsOptions));
+// app.use(cors);
 
 // Middleware for parsing requests
 app.use(express.json({ limit: '10mb' }));

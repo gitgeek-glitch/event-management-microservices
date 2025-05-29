@@ -32,7 +32,7 @@ const paymentSchema = new mongoose.Schema({
     default: "created"
   },
   studentId: {
-    type: String,
+    type: Number,
     required: true
   },
   eventId: {
@@ -40,7 +40,7 @@ const paymentSchema = new mongoose.Schema({
     required: true
   },
   registrationId: {
-    type: String,
+    type: Number,
     required: true
   },
   paymentMethod: {

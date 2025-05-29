@@ -36,7 +36,6 @@ const validateCreateOrder = (req, res, next) => {
   }
   if (!studentId) errors.push('studentId is required');
   if (!eventId) errors.push('eventId is required');
-  if (!registrationId) errors.push('registrationId is required');
   
   if (errors.length > 0) {
     return res.status(400).json({ 
