@@ -4,8 +4,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const REGISTRATION_URL = "http://localhost:3003/api/registrations";
-const STUDENT_URL = "http://localhost:3003/api/students";
-const EMAIL_URL = "http://localhost:3004/api/emails/send";
+const STUDENT_URL = "http://localhost:3002/api/students";
+const EMAIL_URL = "http://localhost:3005/api/email/send";
 
 export const createSession = async (req, res) => {
   try {
@@ -14,29 +14,23 @@ export const createSession = async (req, res) => {
 
     // 1. Get winner's registration
     const winnerRegistrationId = req.body.winner;
-    const winnerRegistrationRes = await axios.get(`${REGISTRATION_URL}/${winnerRegistrationId}`);
+    const winnerRegistrationRes = await axios.get(`${REGISTRATION_URL}/${winnerRegistrationId}`);   
 
-    console.log(winnerRegistrationRes);    
-
-    const winnerRegistration = winnerRegistrationRes.data;
+    const winnerRegistration = winnerRegistrationRes.data.data;
 
     // Get student details of winner
     const winnerStudentId = winnerRegistration.team_leader_id;
     const winnerStudentRes = await axios.get(`${STUDENT_URL}/id/${winnerStudentId}`);
-
-    console.log(winnerStudentRes);
     
-    const winnerEmail = winnerStudentRes.data.email;
+    const winnerEmail = winnerStudentRes.data.data.email;
 
     // Send email to winner
     const emailRes = await axios.post(EMAIL_URL, {
       to: winnerEmail,
       subject: "Congratulations! You won the event",
-      text: `Your team "${winnerRegistration.team_name}" has won the event!`,
+      message: `Your team "${winnerRegistration.team_name}" has won the event!`,
       html: `<p>Your team <strong>${winnerRegistration.team_name}</strong> has won the event! 🏆</p>`,
     });
-
-    console.log(emailRes);
     
 
     // 2. Notify all participants in scores
@@ -49,13 +43,14 @@ export const createSession = async (req, res) => {
       const registration = regRes.data;
 
       const studentId = registration.team_leader_id;
+
       const studentRes = await axios.get(`${STUDENT_URL}/id/${studentId}`);
       const email = studentRes.data.email;
 
       await axios.post(EMAIL_URL, {
         to: email,
         subject: "Event Remarks",
-        text: `Remarks for your team "${registration.team_name}": ${scoreEntry.remarks}`,
+        message: `Remarks for your team "${registration.team_name}": ${scoreEntry.remarks}`,
         html: `<p>Remarks for your team <strong>${registration.team_name}</strong>: ${scoreEntry.remarks}</p>`,
       });
     }

@@ -163,6 +163,46 @@ export const getRegistrationById = async (req, res) => {
   }
 };
 
+export const getRegistrationsByParticipantId = async (req, res) => {
+  try {
+    const { participant_id } = req.params;
+    
+    if (!participant_id || isNaN(parseInt(participant_id))) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid participant ID - must be a valid number"
+      });
+    }
+    
+    const registrations = await Registration.findByParticipantId(participant_id);
+
+    // Extract unique event information for better response format
+    const eventDetails = registrations.map(registration => ({
+      registration_id: registration.id,
+      event_id: registration.event_id,
+      team_name: registration.team_name,
+      payment_id: registration.payment_id,
+      team_leader_id: registration.team_leader_id,
+      all_participants: registration.participants_id,
+      is_team_leader: registration.team_leader_id === parseInt(participant_id)
+    }));
+
+    res.json({
+      success: true,
+      participant_id: parseInt(participant_id),
+      total_registrations: registrations.length,
+      registrations: eventDetails,
+      message: `Found ${registrations.length} registration(s) for participant ID ${participant_id}`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Error fetching participant registrations",
+      message: error.message
+    });
+  }
+};
+
 export const updateRegistration = async (req, res) => {
   try {
     const { id } = req.params;
